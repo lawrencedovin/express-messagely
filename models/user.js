@@ -59,15 +59,21 @@ class User {
            RETURNING username`,
         [username]);
 
-    if (!result.rows[0]) {
-      throw new ExpressError(`No such user: ${username}`, 404);
-    }
+    if (!result.rows[0]) throw new ExpressError(`No such user: ${username}`, 404);
   }
 
   /** All: basic info on all users:
    * [{username, first_name, last_name, phone}, ...] */
 
-  static async all() { }
+  static async all() { 
+    const results = db.query(
+      `SELECT username, first_name, last_name, phone
+      FROM users
+      ORDER BY username`
+    );
+
+    return results.rows[0]
+  }
 
   /** Get: get user by username
    *
@@ -78,7 +84,16 @@ class User {
    *          join_at,
    *          last_login_at } */
 
-  static async get(username) { }
+  static async get(username) {
+    const results = db.query(
+      `SELECT *
+      FROM users
+      WHERE username=$1`,
+      [username]
+      );
+
+      if(!results.rows[0]) throw new ExpressError(`No such user: ${username}`, 404);
+   }
 
   /** Return messages from this user.
    *
