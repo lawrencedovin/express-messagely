@@ -6,6 +6,7 @@ const ExpressError = require("../expressError");
 
 const { BCRYPT_WORK_FACTOR } = require("../config");
 
+
 /** User of the site. */
 
 class User {
@@ -14,40 +15,34 @@ class User {
    *    {username, password, first_name, last_name, phone}
    */
 
-  static async register({username, password, first_name, last_name, phone}) { 
-    // hash password
-    const hashedPassword = await bcrypt.hash(password, BCRYPT_WORK_FACTOR);
-    // save to db
-    const results = await db.query(
+  static async register({username, password, first_name, last_name, phone}) {
+    let hashedPassword = await bcrypt.hash(password, BCRYPT_WORK_FACTOR);
+    const result = await db.query(
         `INSERT INTO users (
-          username,
-          password,
-          first_name,
-          last_name,
-          phone,
-          join_at,
-          last_login_at)
-        VALUES ($1, $2, $3, $4, $5, current_timestamp, current_timestamp)
-        RETURNING username, password, first_name, last_name, phone`,
+              username,
+              password,
+              first_name,
+              last_name,
+              phone,
+              join_at,
+              last_login_at)
+            VALUES ($1, $2, $3, $4, $5, current_timestamp, current_timestamp)
+            RETURNING username, password, first_name, last_name, phone`,
         [username, hashedPassword, first_name, last_name, phone]
     );
-
-    return results.rows[0];
+    return result.rows[0];
   }
 
   /** Authenticate: is this username/password valid? Returns boolean. */
 
   static async authenticate(username, password) {
     const result = await db.query(
-        `SELECT password 
-        FROM users 
-        WHERE username = $1`,
+        "SELECT password FROM users WHERE username = $1",
         [username]);
     let user = result.rows[0];
 
     return user && await bcrypt.compare(password, user.password);
   }
-
 
   /** Update last_login_at for user */
 
@@ -59,20 +54,24 @@ class User {
            RETURNING username`,
         [username]);
 
-    if (!result.rows[0]) throw new ExpressError(`No such user: ${username}`, 404);
+    if (!result.rows[0]) {
+      throw new ExpressError(`No such user: ${username}`, 404);
+    }
   }
 
   /** All: basic info on all users:
-   * [{username, first_name, last_name, phone}, ...] */
+   * [{username, first_name, last_name}, ...] */
 
-  static async all() { 
-    const results = db.query(
-      `SELECT username, first_name, last_name, phone
-      FROM users
-      ORDER BY username`
-    );
+  static async all() {
+    const result = await db.query(
+        `SELECT username,
+                first_name,
+                last_name,
+                phone
+            FROM users
+            ORDER BY username`);
 
-    return results.rows[0];
+    return result.rows;
   }
 
   /** Get: get user by username
@@ -85,16 +84,23 @@ class User {
    *          last_login_at } */
 
   static async get(username) {
-    const results = db.query(
-      `SELECT *
-      FROM users
-      WHERE username=$1`,
-      [username]);
+    const result = await db.query(
+        `SELECT username,
+                first_name,
+                last_name,
+                phone,
+                join_at,
+                last_login_at
+            FROM users
+            WHERE username = $1`,
+        [username]);
 
-      if(!results.rows[0]) throw new ExpressError(`No such user: ${username}`, 404);
+    if (!result.rows[0]) {
+      throw new ExpressError(`No such user: ${username}`, 404);
+    }
 
-      return results.rows[0];
-   }
+    return result.rows[0];
+  }
 
   /** Return messages from this user.
    *
@@ -106,18 +112,18 @@ class User {
 
   static async messagesFrom(username) {
     const result = await db.query(
-      `SELECT m.id,
-              m.to_username,
-              u.first_name,
-              u.last_name,
-              u.phone,
-              m.body,
-              m.sent_at,
-              m.read_at
-        FROM messages AS m
-          JOIN users AS u ON m.to_username = u.username
-        WHERE from_username = $1`,
-      [username]);
+        `SELECT m.id,
+                m.to_username,
+                u.first_name,
+                u.last_name,
+                u.phone,
+                m.body,
+                m.sent_at,
+                m.read_at
+          FROM messages AS m
+            JOIN users AS u ON m.to_username = u.username
+          WHERE from_username = $1`,
+        [username]);
 
     return result.rows.map(m => ({
       id: m.id,
@@ -141,7 +147,7 @@ class User {
    *   {id, first_name, last_name, phone}
    */
 
-   static async messagesTo(username) {
+  static async messagesTo(username) {
     const result = await db.query(
         `SELECT m.id,
                 m.from_username,
@@ -170,7 +176,6 @@ class User {
     }));
   }
 }
-
 
 
 module.exports = User;
